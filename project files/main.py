@@ -26,13 +26,14 @@ cursor = db.cursor()
 
 # ПАРСЕР
 
-tree = ET.iterparse('/Users/yanakosareva/PycharmProjects/pythonProject1/map')
+tree = ET.iterparse('/Users/yanakosareva/Desktop/papka/geocoder project/geocoder/project files/map')
 rows_count = 0
 node_tags = set()
 way_tags = set()
 
 
 def do():
+    global tree
     global rows_count
     for event, elem in tree:
         rows_count += 1
@@ -49,29 +50,32 @@ def do():
                     if key not in ['id', 'nodes']:
                         way_tags.add(key)
         # elif elem.tag == 'relation':
+    # ФОРМИРОВАНИЕ СТОЛБЦОВ В ТАБЛИЦАХ
+    # ПОГУГЛИТЬ ПРО КВАДРАТНЫЕ СКОПКИ ВОЗЛЕ tag
+    node_fields = ''
+    for tag in node_tags:
+        node_fields += f', [{tag}] TEXT'
+    way_fields = ''
+    for tag in way_tags:
+        way_fields += f', [{tag}] TEXT'
 
+    cursor.execute(f"CREATE TABLE IF NOT EXISTS nodes "
+                   f"(id INTEGER,"
+                   f"lat DOUBLE,"
+                   f"lon DOUBLE"
+                   f"{node_fields})")
+    cursor.execute(f"CREATE TABLE IF NOT EXISTS ways "
+                   f"(id INTEGER,"
+                   f"nodes TEXT"
+                   f"{way_fields})")
+    del tree
+    new_tree = ET.iterparse(
+        '/Users/yanakosareva/Desktop/papka/geocoder project/geocoder/project files/map')
 
-# ФОРМИРОВАНИЕ СТОЛБЦОВ В ТАБЛИЦАХ
-# ПОГУГЛИТЬ ПРО КВАДРАТНЫЕ СКОПКИ ВОЗЛЕ tag
-node_fields = ''
-for tag in node_tags:
-    node_fields += f', [{tag}] TEXT'
-way_fields = ''
-for tag in way_tags:
-    way_fields += f', [{tag}] TEXT'
-
-cursor.execute(f"CREATE TABLE IF NOT EXISTS nodes "
-               f"(id INTEGER,"
-               f"lat DOUBLE,"
-               f"lon DOUBLE"
-               f"{node_fields})")
-cursor.execute(f"CREATE TABLE IF NOT EXISTS ways "
-               f"(id INTEGER,"
-               f"nodes TEXT"
-               f"{way_fields})")
-
-
-# ЗАПОЛНЕНИЕ БАЗЫ
+    # ЗАПОЛНЕНИЕ БАЗЫ
+    for event, elem in new_tree:
+        if elem.tag == 'node':
+            parse_node(elem)
 
 
 def parse_node(elem):
@@ -84,12 +88,20 @@ def parse_node(elem):
         value = tag.attrib['v']
         keys.append(key)
         values.append(value)
+    fill_row(keys, values, 'nodes')
+
+def parse_way(elem):
+    children = list(elem)
 
 
-def fill_row(keys, values):
+def fill_row(keys: list, values: list, table: str):
     global cursor
-    cursor.execute()
+    q = '?' + ', ?' * (len(values)-1)
+    keys = map(lambda x: f'[{x}]', keys)
+    keys = '(' + ', '.join(keys) + ')'
+    cursor.execute(f"INSERT INTO {table} {keys} "
+                   f"VALUES ({q})", tuple(values))
 
 
-del tree
+do()
 db.commit()
