@@ -1,5 +1,5 @@
 import os
-import parser
+import parser_xml
 import sqlite3
 import requests
 import direct_geocoding
@@ -29,7 +29,7 @@ else:
         for chunk in response.iter_content(chunk_size=10 * 1024 * 1024):
             if chunk:
                 f.write(chunk)
-    parser = parser.Parser(city)
+    parser = parser_xml.Parser(city)
     parser.parse_xml(f'./{city}.xml')
     geocoder.do_geocoding()
 
