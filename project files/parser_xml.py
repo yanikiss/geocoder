@@ -19,6 +19,7 @@ class Parser:
         file_name = "./node_way_tags.pickle"
 
         # if not os.path.isfile(file_name):
+        print('Creating and loading the database...Please, wait 1 minute')
         for event, elem in tree:
             if elem.tag == 'node':
                 self.id_nodes2lat_lon[elem.attrib['id']] = [
@@ -105,7 +106,7 @@ class Parser:
                 nodes.add(child_id)
             elif child.tag == 'tag':
                 key = child.attrib['k'].lower()
-                value = child.attrib['v']
+                value = child.attrib['v'].lower()
                 keys.append(key)
                 values.append(value)
         lons = 0
