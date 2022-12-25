@@ -1,13 +1,13 @@
 import xml.etree.ElementTree as ET
 import os
 import sqlite3
-import time
+from tqdm import tqdm
 import pickle
 
 
 class Parser:
     def __init__(self, city):
-        self.db = sqlite3.connect(city+'.db')
+        self.db = sqlite3.connect(city + '.db')
         self.cursor = self.db.cursor()
         self.id_nodes2lat_lon = {}
 
@@ -18,16 +18,17 @@ class Parser:
         tree = ET.iterparse(xml_file_location)
         file_name = "./node_way_tags.pickle"
 
-        # if not os.path.isfile(file_name):
         print('Creating and loading the database...Please, wait 1 minute')
+        c = 0
         for event, elem in tree:
+            c += 1
             if elem.tag == 'node':
                 self.id_nodes2lat_lon[elem.attrib['id']] = [
                     float(elem.attrib['lat']), float(elem.attrib['lon'])]
-                # for tag in list(elem):
-                #     key = tag.attrib['k'].lower()
-                #     if key not in ['id', 'lat', 'lon']:
-                #         node_tags.add(key)
+                for tag in list(elem):
+                    key = tag.attrib['k'].lower()
+                    if key not in ['id', 'lat', 'lon']:
+                        node_tags.add(key)
             elif elem.tag == 'way':
                 children = list(elem)
                 for child in children:
@@ -51,59 +52,69 @@ class Parser:
 
         # ФОРМИРОВАНИЕ СТОЛБЦОВ В ТАБЛИЦАХ
 
-        # node_fields = ''
-        # for tag in node_tags:
-        #     node_fields += f', [{tag}] TEXT'
+        node_fields = ''
+        for tag in node_tags:
+            node_fields += f', [{tag}] TEXT'
         way_fields = ''
         for tag in way_tags:
             way_fields += f', [{tag}] TEXT'
 
-        # self.cursor.execute(f"CREATE TABLE IF NOT EXISTS nodes "
-        #                f"(id INTEGER,"
-        #                f"lat DOUBLE,"
-        #                f"lon DOUBLE"
-        #                f"{node_fields})")
+        self.cursor.execute(f"CREATE TABLE IF NOT EXISTS nodes "
+                            f"(id INTEGER,"
+                            f"lat DOUBLE,"
+                            f"lon DOUBLE"
+                            f"{node_fields})")
         self.cursor.execute(f"CREATE TABLE IF NOT EXISTS ways "
-                       f"(id INTEGER,"
-                       f"lat DOUBLE,"
-                       f"lon DOUBLE"
-                       f"{way_fields})")
+                            f"(id INTEGER,"
+                            f"lat DOUBLE,"
+                            f"lon DOUBLE,"
+                            f"nodes TEXT"
+                            f"{way_fields})")
 
         del tree
         new_tree = ET.iterparse(xml_file_location)
 
         # ЗАПОЛНЕНИЕ БАЗЫ
         for event, elem in new_tree:
-            # if elem.tag == 'node':
-            #     self.parse_node(elem)
+            if elem.tag == 'node':
+                self.parse_node(elem)
             if elem.tag == 'way':
                 self.parse_way(elem)
+        print('Done')
+
+        self.cursor.execute(f"CREATE INDEX IF NOT EXISTS "
+                            f"street_and_housenumber_idx "
+                            f"ON ways ([addr:street], [addr:housenumber])")
+        self.cursor.execute(f"CREATE INDEX IF NOT EXISTS "
+                            f"id_lat_and_lon_idx "
+                            f"ON nodes (id, lat, lon)")
 
         self.db.commit()
         os.remove(xml_file_location)
 
-    # def parse_node(self, elem):
-    #     tags = list(elem)
-    #     attributes = elem.attrib
-    #     keys = ['id', 'lat', 'lon']
-    #     values = [attributes['id'], attributes['lat'], attributes['lon']]
-    #     for tag in tags:
-    #         key = tag.attrib['k'].lower()
-    #         value = tag.attrib['v']
-    #         keys.append(key)
-    #         values.append(value)
-    #     self.fill_row(keys, values, 'nodes')
+    def parse_node(self, elem):
+        tags = list(elem)
+        attributes = elem.attrib
+        keys = ['id', 'lat', 'lon']
+        values = [attributes['id'], attributes['lat'], attributes['lon']]
+        for tag in tags:
+            key = tag.attrib['k'].lower()
+            value = tag.attrib['v']
+            keys.append(key)
+            values.append(value)
+        self.fill_row(keys, values, 'nodes')
 
     def parse_way(self, elem):
         children = list(elem)
         attributes = elem.attrib
         nodes = set()
-        keys = ['id', 'lat', 'lon']
-        values = [attributes['id'], 0, 0]
+        keys = ['id', 'lat', 'lon', 'nodes']
+        values = [attributes['id'], 0, 0, '']
         for child in children:
             if child.tag == 'nd':
                 child_id = child.attrib['ref']
                 nodes.add(child_id)
+                values[3] += f'{child_id} '
             elif child.tag == 'tag':
                 key = child.attrib['k'].lower()
                 value = child.attrib['v'].lower()
@@ -133,4 +144,3 @@ class Parser:
         keys = '(' + ', '.join(keys) + ')'
         query = f"INSERT INTO {table} {keys} VALUES ({q})"
         self.cursor.execute(query, tuple(values))
-

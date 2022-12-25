@@ -25,7 +25,7 @@
         </library>
       </libraries>
     </data-source>
-    <data-source source="LOCAL" name="Екатеринбург" uuid="2ecd4980-4f1a-4b93-b2ff-02f7560119f2">
+    <data-source source="LOCAL" name="Екатеринбург" uuid="e25bb118-8f49-477e-a8a0-d1e21bd2fe2d">
       <driver-ref>sqlite.xerial</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.sqlite.JDBC</jdbc-driver>

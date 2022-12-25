@@ -1,21 +1,27 @@
 import os
-import parser_xml
+from Parsers import Parser_xml
 import sqlite3
 import requests
-import direct_geocoding
+import Direct_geocoding
+from Request_Handler import Request_handler
+import Db
 
-
-print('Hello! This is an application for geocoding addresses of Russia \n'
-      'Please enter city\n', end='>>>')
+print('Привет! Эта утилита для геокодирования адресов больших городов России \n'
+      'Введите название города\n', end='>>>')
 city = input().strip()
-print('Enter street name\n', end='>>>')
+print('Введите название улицы\n', end='>>>')
 street = input().strip()
-print('Enter house number\n', end='>>>')
+print('Введите номер дома\n', end='>>>')
 house_number = input().strip()
+print('Вывести список организаций в здании? [да/нет]\n', end='>>>')
+org_flag = input().strip()
 
-geocoder = direct_geocoding.Geocoder(city, street, house_number)
+req_handler = Request_handler.RequestHandler(city, street)
+geocoder = Direct_geocoding.Geocoder(req_handler.city, req_handler.street,
+                                     house_number, org_flag)
 file_name_db = geocoder.city + '.db'
 if os.path.isfile(file_name_db):
+    geocoder.db = Db.Db(geocoder.city)
     geocoder.do_geocoding()
 else:
     db = sqlite3.connect('cities.db')
@@ -35,7 +41,10 @@ else:
             for chunk in response.iter_content(chunk_size=10 * 1024 * 1024):
                 if chunk:
                     f.write(chunk)
-        parser = parser_xml.Parser(geocoder.city)
+        f.close()
+        parser = Parser_xml.Parser(geocoder.city)
         parser.parse_xml(f'./{geocoder.city}.xml')
+
+        geocoder.db = Db.Db(geocoder.city)
         geocoder.do_geocoding()
 
